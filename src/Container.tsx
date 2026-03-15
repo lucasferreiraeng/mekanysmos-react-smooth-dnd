@@ -1,47 +1,117 @@
-import React, { useRef, useEffect, useCallback, CSSProperties } from 'react';
+import React, {
+	useRef,
+	useEffect,
+	useCallback,
+	forwardRef,
+	useImperativeHandle,
+} from 'react';
 import { smoothDnD as container, ContainerOptions, SmoothDnD } from 'smooth-dnd';
 import { dropHandlers } from 'smooth-dnd';
 
 container.dropHandler = dropHandlers.reactDropHandler().handler;
 container.wrapChild = false;
 
-interface ContainerProps extends ContainerOptions {
+const CONTAINER_OPTION_KEYS: Set<string> = new Set([
+	'behaviour',
+	'groupName',
+	'orientation',
+	'dragHandleSelector',
+	'nonDragAreaSelector',
+	'dragBeginDelay',
+	'animationDuration',
+	'autoScrollEnabled',
+	'lockAxis',
+	'dragClass',
+	'dropClass',
+	'removeOnDropOut',
+	'dropPlaceholder',
+	'onDragStart',
+	'onDragEnd',
+	'onDrop',
+	'onDropReady',
+	'getChildPayload',
+	'shouldAnimateDrop',
+	'shouldAcceptDrop',
+	'onDragEnter',
+	'onDragLeave',
+	'getGhostParent',
+]);
+
+type ElementType = React.ElementType;
+
+type ContainerProps<T extends ElementType = 'div'> = ContainerOptions & {
+	/** Render as a different HTML element. Default: 'div' */
+	as?: T;
+	/** @deprecated Use `as` prop instead. Custom render function for the container root. */
 	render?: (rootRef: React.RefObject<any>) => React.ReactElement;
-	style?: CSSProperties;
 	children?: React.ReactNode;
+} & Omit<
+		React.ComponentPropsWithoutRef<T>,
+		keyof ContainerOptions | 'as' | 'render' | 'children'
+	>;
+
+function splitProps(
+	props: Record<string, any>
+): { dndOptions: Record<string, any>; htmlProps: Record<string, any> } {
+	const dndOptions: Record<string, any> = {};
+	const htmlProps: Record<string, any> = {};
+
+	for (const key of Object.keys(props)) {
+		if (CONTAINER_OPTION_KEYS.has(key)) {
+			dndOptions[key] = props[key];
+		} else {
+			htmlProps[key] = props[key];
+		}
+	}
+
+	return { dndOptions, htmlProps };
 }
 
-function Container({
-	behaviour = 'move',
-	orientation = 'vertical',
-	...rest
-}: ContainerProps) {
-	const props = { behaviour, orientation, ...rest };
-	const { render, children, style, ...containerOptions } = props;
-	const containerRef = useRef<HTMLDivElement>(null);
+function ContainerInner<T extends ElementType = 'div'>(
+	{
+		as,
+		render,
+		children,
+		behaviour = 'move',
+		orientation = 'vertical',
+		...rest
+	}: ContainerProps<T>,
+	ref: React.ForwardedRef<HTMLElement>
+) {
+	const innerRef = useRef<HTMLElement>(null);
 	const smoothDnDRef = useRef<SmoothDnD | null>(null);
 	const prevContainerRef = useRef<HTMLElement | null>(null);
-	const propsRef = useRef(props);
-	propsRef.current = props;
+
+	useImperativeHandle(ref, () => innerRef.current as HTMLElement);
+
+	const allDndProps = { behaviour, orientation, ...rest };
+	const propsRef = useRef(allDndProps);
+	propsRef.current = allDndProps;
 
 	const getContainerOptions = useCallback((): ContainerOptions => {
-		return Object.keys(propsRef.current).reduce((result: Record<string, any>, key: string) => {
-			const prop = (propsRef.current as Record<string, any>)[key];
+		const { dndOptions } = splitProps(propsRef.current);
 
-			if (typeof prop === 'function') {
-				result[key] = (...params: any[]) => {
-					return ((propsRef.current as Record<string, any>)[key] as Function)(...params);
-				};
-			} else {
-				result[key] = prop;
-			}
+		return Object.keys(dndOptions).reduce(
+			(result: Record<string, any>, key: string) => {
+				const prop = dndOptions[key];
 
-			return result;
-		}, {}) as ContainerOptions;
+				if (typeof prop === 'function') {
+					result[key] = (...params: any[]) => {
+						const { dndOptions: current } = splitProps(propsRef.current);
+						return (current[key] as Function)(...params);
+					};
+				} else {
+					result[key] = prop;
+				}
+
+				return result;
+			},
+			{}
+		) as ContainerOptions;
 	}, []);
 
 	useEffect(() => {
-		const element = containerRef.current;
+		const element = innerRef.current;
 		if (element) {
 			prevContainerRef.current = element;
 			smoothDnDRef.current = container(element, getContainerOptions());
@@ -56,7 +126,7 @@ function Container({
 	}, [getContainerOptions]);
 
 	useEffect(() => {
-		const element = containerRef.current;
+		const element = innerRef.current;
 		if (!element || !smoothDnDRef.current) return;
 
 		if (prevContainerRef.current && prevContainerRef.current !== element) {
@@ -69,15 +139,24 @@ function Container({
 		smoothDnDRef.current.setOptions(getContainerOptions());
 	});
 
+	// Legacy render prop support
 	if (render) {
-		return render(containerRef);
+		return render(innerRef as React.RefObject<any>);
 	}
 
+	const { htmlProps } = splitProps(rest);
+	const Component = (as || 'div') as any;
+
 	return (
-		<div style={style} ref={containerRef}>
+		<Component {...htmlProps} ref={innerRef}>
 			{children}
-		</div>
+		</Component>
 	);
 }
 
+const Container = forwardRef(ContainerInner) as <T extends ElementType = 'div'>(
+	props: ContainerProps<T> & { ref?: React.Ref<HTMLElement> }
+) => React.ReactElement | null;
+
+export type { ContainerProps };
 export default Container;

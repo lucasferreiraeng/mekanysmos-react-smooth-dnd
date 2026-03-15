@@ -1,9 +1,6 @@
-import babel from '@rollup/plugin-babel';
+import typescript from 'rollup-plugin-typescript2';
 import terser from '@rollup/plugin-terser';
-import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
-
-const extensions = ['.js', '.jsx', '.ts', '.tsx'];
 
 export default {
 	input: 'index.ts',
@@ -22,22 +19,15 @@ export default {
 			file: './dist/index.esm.js',
 			format: 'esm',
 			sourcemap: false,
-			globals: {
-				'smooth-dnd': 'SmoothDnD',
-				react: 'React',
-			},
 		},
 	],
 	external: ['react', 'smooth-dnd'],
 	plugins: [
-		resolve({ extensions }),
-		babel({
-			extensions,
-			babelHelpers: 'bundled',
-			include: ['./index.ts', 'src/**/*'],
-			exclude: 'node_modules/**',
+		resolve(),
+		typescript({
+			tsconfig: './tsconfig.json',
+			useTsconfigDeclarationDir: true,
 		}),
-		commonjs(),
 		terser(),
 	],
 };
