@@ -1,15 +1,16 @@
 {
-  "name": "react-smooth-dnd",
-  "version": "0.12.0",
-  "description": "Drag and Drop library",
+  "name": "@mekanysmos/react-smooth-dnd",
+  "version": "1.0.0",
+  "description": "React wrapper components for smooth-dnd drag and drop library. Compatible with React 17, 18, and 19.",
   "main": "./dist/index.js",
   "module": "./dist/index.esm.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "bundle": "rollup -c --environment INCLUDE_DEPS,BUILD:production",
     "tsc": "tsc --emitDeclarationOnly --outDir dist",
-    "build": "npm run tsc && npm run bundle"
+    "build": "npm run tsc && npm run bundle",
+    "prepublishOnly": "npm run build"
   },
-  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -21,16 +22,20 @@
     "drag",
     "drop",
     "draggable",
-    "dnd"
+    "dnd",
+    "react-19"
   ],
   "author": {
-    "name": "Kutlu Sahin",
-    "email": "kutlugsahin@gmail.com"
+    "name": "Mekanysmos"
   },
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kutlugsahin/react-smooth-dnd.git"
+    "url": "https://github.com/lucasferreiraeng/mekanysmos-react-smooth-dnd.git"
+  },
+  "homepage": "https://github.com/lucasferreiraeng/mekanysmos-react-smooth-dnd#readme",
+  "bugs": {
+    "url": "https://github.com/lucasferreiraeng/mekanysmos-react-smooth-dnd/issues"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",
