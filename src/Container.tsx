@@ -1,5 +1,4 @@
-import React, { Component, CSSProperties } from 'react';
-import PropTypes from 'prop-types';
+import React, { useRef, useEffect, useCallback, CSSProperties } from 'react';
 import { smoothDnD as container, ContainerOptions, SmoothDnD } from 'smooth-dnd';
 import { dropHandlers } from 'smooth-dnd';
 
@@ -9,133 +8,76 @@ container.wrapChild = false;
 interface ContainerProps extends ContainerOptions {
 	render?: (rootRef: React.RefObject<any>) => React.ReactElement;
 	style?: CSSProperties;
+	children?: React.ReactNode;
 }
 
-class Container extends Component<ContainerProps> {
-	public static propTypes = {
-		behaviour: PropTypes.oneOf(['move', 'copy', 'drop-zone', 'contain']),
-		groupName: PropTypes.string,
-		orientation: PropTypes.oneOf(['horizontal', 'vertical']),
-		style: PropTypes.object,
-		dragHandleSelector: PropTypes.string,
-		nonDragAreaSelector: PropTypes.string,
-		dragBeginDelay: PropTypes.number,
-		animationDuration: PropTypes.number,
-		autoScrollEnabled: PropTypes.bool,
-		lockAxis: PropTypes.string,
-		dragClass: PropTypes.string,
-		dropClass: PropTypes.string,
-		onDragStart: PropTypes.func,
-		onDragEnd: PropTypes.func,
-		onDrop: PropTypes.func,
-		getChildPayload: PropTypes.func,
-		shouldAnimateDrop: PropTypes.func,
-		shouldAcceptDrop: PropTypes.func,
-		onDragEnter: PropTypes.func,
-		onDragLeave: PropTypes.func,
-		render: PropTypes.func,
-		getGhostParent: PropTypes.func,
-    removeOnDropOut: PropTypes.bool,
-    dropPlaceholder: PropTypes.oneOfType([
-      PropTypes.shape({
-        className: PropTypes.string,
-        animationDuration: PropTypes.number,
-        showOnTop: PropTypes.bool,
-      }),
-      PropTypes.bool,
-    ]),
-	};
+function Container({
+	behaviour = 'move',
+	orientation = 'vertical',
+	...rest
+}: ContainerProps) {
+	const props = { behaviour, orientation, ...rest };
+	const { render, children, style, ...containerOptions } = props;
+	const containerRef = useRef<HTMLDivElement>(null);
+	const smoothDnDRef = useRef<SmoothDnD | null>(null);
+	const prevContainerRef = useRef<HTMLElement | null>(null);
+	const propsRef = useRef(props);
+	propsRef.current = props;
 
-	public static defaultProps = {
-		behaviour: 'move',
-		orientation: 'vertical',
-	};
+	const getContainerOptions = useCallback((): ContainerOptions => {
+		return Object.keys(propsRef.current).reduce((result: Record<string, any>, key: string) => {
+			const prop = (propsRef.current as Record<string, any>)[key];
 
-	prevContainer: null;
-	container: SmoothDnD = null!;
-	containerRef: React.RefObject<any> = React.createRef();
-  constructor(props: ContainerProps) {
-    super(props);
-		this.getContainerOptions = this.getContainerOptions.bind(this);
-    this.getContainer = this.getContainer.bind(this);
-    this.isObjectTypePropsChanged = this.isObjectTypePropsChanged.bind(this);
-    this.prevContainer = null;
-  }
+			if (typeof prop === 'function') {
+				result[key] = (...params: any[]) => {
+					return ((propsRef.current as Record<string, any>)[key] as Function)(...params);
+				};
+			} else {
+				result[key] = prop;
+			}
 
-  componentDidMount() {
-    this.prevContainer = this.getContainer();
-    this.container = container(this.getContainer(), this.getContainerOptions());
-  }
+			return result;
+		}, {}) as ContainerOptions;
+	}, []);
 
-  componentWillUnmount() {
-    this.container.dispose();
-    this.container = null!;
-  }
+	useEffect(() => {
+		const element = containerRef.current;
+		if (element) {
+			prevContainerRef.current = element;
+			smoothDnDRef.current = container(element, getContainerOptions());
+		}
 
-  componentDidUpdate(prevProps: ContainerProps) {
-    if (this.getContainer()) {
-      if (this.prevContainer && this.prevContainer !== this.getContainer()) {
-        this.container.dispose();
-        this.container = container(this.getContainer(), this.getContainerOptions());
-        this.prevContainer = this.getContainer();
-        return;
-      }
+		return () => {
+			if (smoothDnDRef.current) {
+				smoothDnDRef.current.dispose();
+				smoothDnDRef.current = null;
+			}
+		};
+	}, [getContainerOptions]);
 
-      if (this.isObjectTypePropsChanged(prevProps)) {
-        this.container.setOptions(this.getContainerOptions())
-      }
-    }
-  }
+	useEffect(() => {
+		const element = containerRef.current;
+		if (!element || !smoothDnDRef.current) return;
 
-  isObjectTypePropsChanged(prevProps: ContainerProps) {
-    const { render, children, style, ...containerOptions } = this.props;
+		if (prevContainerRef.current && prevContainerRef.current !== element) {
+			smoothDnDRef.current.dispose();
+			smoothDnDRef.current = container(element, getContainerOptions());
+			prevContainerRef.current = element;
+			return;
+		}
 
-    for (const _key in containerOptions) {
-      const key = _key as keyof ContainerOptions;
-      if (containerOptions.hasOwnProperty(key)) {
-        const prop = containerOptions[key];
+		smoothDnDRef.current.setOptions(getContainerOptions());
+	});
 
-        if (typeof prop !== 'function' && prop !== prevProps[key]) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  render() {
-    if (this.props.render) {
-			return this.props.render(this.containerRef);
-    } else {
-      return (
-        <div style={this.props.style} ref={this.containerRef}>
-          {this.props.children}
-        </div>
-      );
-    }
-	}
-	
-  getContainer() {
-		return this.containerRef.current;
+	if (render) {
+		return render(containerRef);
 	}
 
-  getContainerOptions(): ContainerOptions {
-    return Object.keys(this.props).reduce((result: ContainerOptions, key: string) => {
-      const optionName = key as keyof ContainerOptions;
-      const prop = this.props[optionName];
-
-      if (typeof prop === 'function') {
-        result[optionName] = (...params: any[]) => {
-          return (this.props[optionName] as Function)(...params);
-        }
-      } else {
-        result[optionName] = prop;
-      }
-
-      return result;
-    },{}) as ContainerOptions;
-  }
+	return (
+		<div style={style} ref={containerRef}>
+			{children}
+		</div>
+	);
 }
 
 export default Container;

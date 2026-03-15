@@ -1,33 +1,27 @@
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
+import React from 'react';
 import { constants } from 'smooth-dnd';
-const {
-	wrapperClass
-} = constants;
+const { wrapperClass } = constants;
 
 export interface DraggableProps {
 	render?: () => React.ReactElement;
 	className?: string;
+	children?: React.ReactNode;
+	[key: string]: any;
 }
 
-class Draggable extends Component<DraggableProps> {
-	public static propsTypes = {
-		render: PropTypes.func,
-		className: PropTypes.string,
+function Draggable(props: DraggableProps) {
+	const { render, className, children, ...restProps } = props;
+
+	if (render) {
+		return React.cloneElement(render(), { className: wrapperClass } as any);
 	}
 
-	render() {
-		if (this.props.render) {
-			return React.cloneElement(this.props.render(), { className: wrapperClass });
-		}
-		
-		const clsName = `${this.props.className ? (this.props.className + ' ') : ''}`
-		return (
-			<div {...this.props} className={`${clsName}${wrapperClass}`} >
-				{this.props.children}
-			</div>
-		);
-	}
+	const clsName = `${className ? className + ' ' : ''}`;
+	return (
+		<div {...restProps} className={`${clsName}${wrapperClass}`}>
+			{children}
+		</div>
+	);
 }
 
 export default Draggable;
